@@ -24,6 +24,7 @@ It is designed to support reliable and reproducible data processing through dete
 - Unified Customer 360 transformation.
 - Deterministic pipeline run identification.
 - SQLite database storage.
+- Interaction event history and pipeline run history.
 - Automated reconciliation checks.
 - Structured logging and execution summaries.
 - Automated testing using Pytest.
@@ -59,20 +60,26 @@ The pipeline follows this processing flow:
 11. Data reconciliation.
 12. Execution reports and logs.
 
+For the detailed architecture diagram, see [`docs/architecture.md`](docs/architecture.md).
+
 ## 5. Source Datasets
 
 The pipeline processes four source datasets.
 
 ### Customers
+
 Contains customer identity and contact information, including customer ID, name, email, phone, and creation timestamp.
 
 ### Accounts
+
 Contains customer account information, account types, account statuses, and creation timestamps.
 
 ### Orders
+
 Contains product information, order amounts, order statuses, and order dates.
 
 ### Interactions
+
 Contains customer communication and interaction history.
 
 ## 6. Customer Identity Resolution
@@ -144,9 +151,13 @@ Customer identity mapping and manual review reports also include the run ID.
 
 Repeated processing of unchanged input produces the same run ID and replaces the current output datasets rather than appending duplicate records.
 
-## 10. Database Storage
+Rejected records are retained in quarantine datasets with their rejection reasons, supporting investigation and traceability.
 
-The pipeline stores five tables in SQLite:
+## 10. Database Storage and History
+
+The pipeline stores its current processed datasets in SQLite.
+
+### Current-state tables
 
 - `customers`
 - `accounts`
@@ -154,11 +165,20 @@ The pipeline stores five tables in SQLite:
 - `interactions`
 - `customer_360`
 
+### History tables
+
+- `pipeline_run_history`
+- `interaction_event_history`
+
 Database location:
 
 `data/customer360.db`
 
-The database represents the current processed dataset state rather than maintaining a historical snapshot archive.
+The `pipeline_run_history` table records unique logical pipeline runs, including their run ID, recorded timestamp, and dataset record counts. Reprocessing identical input does not create another history entry for the same run ID.
+
+The `interaction_event_history` table preserves the first-seen version of each interaction event. Duplicate events are not inserted again. If an existing interaction ID is encountered with different event details, the pipeline raises a conflict instead of silently overwriting the original event.
+
+The current-state tables are replaced with the latest processed datasets during a successful run. Full historical snapshots of all customer, account, and order records, and versioned interaction changes, are not implemented.
 
 ## 11. Reconciliation
 
@@ -201,4 +221,154 @@ It was optimized using vectorized Pandas operations such as:
 - `isna()`
 - `duplicated()`
 - `isin()`
-- `to_datetime()
+- `to_datetime()`
+
+This reduced validation time significantly. Actual benchmark results may vary depending on the execution environment.
+
+Benchmark details are available in `outputs/performance_benchmark.json`.
+
+## 13. Project Structure
+
+```text
+customer-360-data-engineering-pipeline/
+│
+├── data/
+│   ├── raw/
+│   ├── processed/
+│   └── quarantine/
+│
+├── docs/
+│   ├── architecture.md
+│   ├── data_dictionary.md
+│   └── design_decisions.md
+│
+├── outputs/
+│   ├── customer_identity_mapping.csv
+│   ├── identity_manual_review.csv
+│   ├── performance_benchmark.json
+│   ├── pipeline.log
+│   ├── reconciliation_report.json
+│   └── run_summary.json
+│
+├── src/
+│   ├── data_generator.py
+│   ├── generate_raw_data.py
+│   ├── ingestion.py
+│   ├── validation.py
+│   ├── identity_resolution.py
+│   ├── customer_360.py
+│   ├── publishing.py
+│   ├── storage.py
+│   ├── reconciliation.py
+│   └── schemas.py
+│
+├── tests/
+│   ├── test_validation.py
+│   ├── test_ingestion.py
+│   ├── test_pipeline_failure.py
+│   ├── test_identity_resolution.py
+│   ├── test_identity_integration.py
+│   └── test_storage_history.py
+│
+├── main.py
+├── benchmark.py
+├── requirements.txt
+└── README.md
+```
+
+## 14. Setup and Execution
+
+### Prerequisites
+
+- Python 3.10 or later.
+- pip.
+
+### Step 1: Clone the repository
+
+```bash
+git clone https://github.com/venkatamanidurgagottimukkala-hub/customer-360-data-engineering-pipeline.git
+cd customer-360-data-engineering-pipeline
+```
+
+### Step 2: Create a virtual environment
+
+```bash
+python -m venv .venv
+```
+
+Activate it on Windows PowerShell:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+### Step 3: Install dependencies
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+### Step 4: Generate raw datasets
+
+```bash
+python -m src.generate_raw_data
+```
+
+This generates the four synthetic CSV datasets in `data/raw/`. Running this command again regenerates those input files.
+
+### Step 5: Execute the pipeline
+
+```bash
+python main.py
+```
+
+The pipeline processes the source datasets, resolves customer identities, generates the Customer 360 output, stores the results in SQLite, and performs reconciliation.
+
+### Step 6: Run automated tests
+
+```bash
+python -m pytest -v
+```
+
+### Step 7: Run the performance benchmark
+
+```bash
+python benchmark.py
+```
+
+## 15. Execution Outputs
+
+The pipeline generates the following outputs:
+
+| Output | Description |
+|---|---|
+| `data/processed/` | Validated and processed datasets |
+| `data/quarantine/` | Rejected records with rejection reasons |
+| `data/customer360.db` | SQLite database |
+| `outputs/run_summary.json` | Pipeline execution summary and metrics |
+| `outputs/reconciliation_report.json` | Reconciliation results |
+| `outputs/customer_identity_mapping.csv` | Customer identity mapping |
+| `outputs/identity_manual_review.csv` | Potential identity conflicts |
+| `outputs/pipeline.log` | Pipeline execution logs |
+| `outputs/performance_benchmark.json` | Benchmark results |
+
+## 16. Test Results
+
+The project includes automated tests covering:
+
+- Data validation.
+- Data ingestion.
+- Pipeline failure handling.
+- Customer identity resolution.
+- Identity resolution integration with dependent datasets.
+- Interaction event history and database transaction handling.
+
+The latest full test execution completed successfully with **27 passed tests**.
+
+---
+
+## Design and Implementation Documentation
+
+- [Architecture](docs/architecture.md)
+- [Data Dictionary](docs/data_dictionary.md)
+- [Design Decisions](docs/design_decisions.md)

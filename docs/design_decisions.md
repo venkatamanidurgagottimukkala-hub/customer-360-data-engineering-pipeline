@@ -1,4 +1,4 @@
-﻿# Customer 360 Data Engineering Pipeline â€” Design Decisions
+﻿# Customer 360 Data Engineering Pipeline - Design Decisions
 
 ## 1. Overview
 
@@ -125,14 +125,14 @@ This ensures that related records remain associated with the resolved customer d
 
 The pipeline produces:
 
-- `outputs/customer_identity_mapping.csv` â€” maps original customer IDs to canonical customer IDs.
-- `outputs/identity_manual_review.csv` â€” identifies uncertain identity matches requiring manual review.
+- `outputs/customer_identity_mapping.csv` - maps original customer IDs to canonical customer IDs.
+- `outputs/identity_manual_review.csv` - identifies uncertain identity matches requiring manual review.
 
 This approach avoids aggressive matching and reduces the risk of incorrectly merging different customers.
 
 ## 6. Customer 360 Transformation
 
-The Customer 360 dataset is created by aggregating account, order and interaction information at customer level.
+The Customer 360 dataset is created by aggregating account, order and interaction information at customer-level.
 
 The transformation calculates:
 
@@ -158,9 +158,16 @@ If the source files remain unchanged, the generated run ID remains the same.
 
 Published CSV files are overwritten rather than appended, preventing duplicate records when the same input is processed repeatedly.
 
-The current SQLite implementation also replaces existing tables with the latest dataset state.
+The current-state SQLite tables are replaced with the latest processed dataset state.
 
-This supports repeatable execution but does not maintain historical snapshots.
+Two additional history tables preserve selected historical information:
+
+- `pipeline_run_history` records unique logical pipeline runs using their deterministic run IDs.
+- `interaction_event_history` preserves the first-seen version of each interaction event.
+
+Repeated processing of identical input does not create duplicate logical run-history entries or duplicate interaction events.
+
+This provides limited history tracking, rather than full historical snapshots of every dataset.
 
 ## 8. Data Lineage
 
@@ -216,104 +223,4 @@ The implementation currently performs 16 checks covering:
 - Customer identity merge adjustments.
 - Database record counts.
 - Customer 360 record count.
-- Order amount totals.
-- Foreign key integrity.
-- Customer-level account counts.
-- Customer-level order counts.
-- Customer-level interaction counts.
-
-The reconciliation report is saved in:
-
-`outputs/reconciliation_report.json`
-
-The pipeline is marked successful only when all reconciliation checks pass.
-
-## 11. Performance Optimization
-
-The initial validation implementation used row-by-row processing through Pandas `iterrows()`.
-
-Benchmarking identified validation as the main performance bottleneck.
-
-The validation implementation was optimized using vectorized Pandas operations, including:
-
-- `isna()`
-- `duplicated()`
-- `isin()`
-- `to_datetime()`
-- `to_numeric()`
-
-### Benchmark Comparison
-
-| Metric | Before | After |
-|---|---:|---:|
-| Records processed | 120,295 | 120,295 |
-| Validation time | 63.03 seconds | 0.33 seconds |
-| Total execution time | 78.91 seconds | 16.14 seconds |
-
-The optimization reduced validation time by approximately 99.48%, achieving approximately 191 times faster validation in the measured benchmark.
-
-## 12. Testing Strategy
-
-Pytest is used to verify important pipeline behaviours.
-
-The automated test suite covers:
-
-- Valid schema acceptance.
-- Missing and unexpected schema columns.
-- Missing source files.
-- Duplicate primary keys.
-- Missing values.
-- Invalid customer references.
-- Invalid dates.
-- Invalid order amounts.
-- Invalid categorical values.
-- Empty customer datasets.
-- Records before customer creation.
-- Pipeline failure handling.
-- Duplicate customer identity resolution.
-- Email and phone normalization.
-- Manual-review scenarios.
-- Deterministic canonical customer selection.
-- Customer identity integration with accounts, orders and interactions.
-
-### Latest Test Results
-
-**23 passed, 0 failed.**
-
-The full automated test suite completed successfully with 23 passed and 0 failed.
-
-## 13. Assumptions and Trade-offs
-
-### Customer Identity
-
-Automatic matching requires both normalized email and phone to match.
-
-This conservative approach reduces the possibility of incorrectly merging different customers.
-
-Records with partial identifier matches are flagged for manual review instead of being automatically merged.
-
-### Historical Data
-
-The current implementation maintains the latest processed state in SQLite by replacing existing tables.
-
-Historical snapshots and event-level change history are not currently maintained.
-
-### Synthetic Data
-
-All generated records are synthetic and intended for development, testing and benchmarking.
-
-### Database Selection
-
-SQLite provides a lightweight local storage solution. A production deployment with higher concurrency and larger workloads could use a server-based relational database.
-
-### Identity Matching Limitations
-
-The current identity-resolution implementation does not use fuzzy name matching or probabilistic matching.
-
-These techniques could be introduced in a future enhancement with additional safeguards and manual-review controls.
-
-## 14. Conclusion
-
-The Customer 360 Data Engineering Pipeline demonstrates an end-to-end data processing workflow involving synthetic data generation, ingestion, validation, identity resolution, transformation, publishing, database storage and reconciliation.
-
-The implementation emphasizes deterministic processing, data quality, traceability, repeatability, automated testing and measurable performance optimization.
+- Order

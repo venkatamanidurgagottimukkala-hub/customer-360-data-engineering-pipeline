@@ -262,7 +262,8 @@ def main():
 
         database_path = save_to_database(
             validated_data,
-            customer_360
+            customer_360,
+            run_id
         )
 
         logger.info(
