@@ -8,7 +8,7 @@ This document describes the schemas, columns, logical data types and purposes of
 
 | Column | Data Type | Description |
 |---|---|---|
-| customer_id | String | Unique customer identifier. Primary key. |
+| customer_id | String | Unique source customer identifier. Primary key. |
 | first_name | String | Customer's first name. |
 | last_name | String | Customer's last name. |
 | email | String | Customer's email address. |
@@ -58,7 +58,7 @@ This document describes the schemas, columns, logical data types and purposes of
 
 | Column | Data Type | Description |
 |---|---|---|
-| customer_id | String | Unique customer identifier. |
+| customer_id | String | Canonical customer identifier after identity resolution. |
 | first_name | String | Customer's first name. |
 | last_name | String | Customer's last name. |
 | email | String | Customer's email address. |
@@ -72,9 +72,32 @@ This document describes the schemas, columns, logical data types and purposes of
 | interaction_count | Integer | Total number of customer interactions. |
 | last_interaction_date | ISO-8601 Timestamp / Null | Most recent interaction date. Null if no interactions exist. |
 
-## 6. Pipeline Metadata
+## 6. Identity Resolution Outputs
 
-The published source datasets also contain:
+### Customer Identity Mapping
+
+**Output:** `outputs/customer_identity_mapping.csv`
+
+| Column | Data Type | Description |
+|---|---|---|
+| original_customer_id | String | Original customer identifier from the source dataset. |
+| canonical_customer_id | String | Deterministic customer identifier assigned to the resolved identity. |
+| run_id | String | Identifier of the processing run. |
+
+### Identity Manual Review
+
+**Output:** `outputs/identity_manual_review.csv`
+
+| Column | Data Type | Description |
+|---|---|---|
+| customer_id_1 | String | First customer identifier in the uncertain match pair. |
+| customer_id_2 | String | Second customer identifier in the uncertain match pair. |
+| match_reason | String | Reason the pair requires manual review. |
+| run_id | String | Identifier of the processing run. |
+
+## 7. Pipeline Metadata
+
+Published source datasets also contain:
 
 | Column | Data Type | Description |
 |---|---|---|
@@ -87,7 +110,7 @@ Rejected datasets additionally contain:
 |---|---|---|
 | rejection_reason | String | Explanation of why the record failed validation. |
 
-## 7. Primary and Foreign Keys
+## 8. Primary and Foreign Keys
 
 | Dataset | Primary Key | Foreign Key |
 |---|---|---|
@@ -97,18 +120,21 @@ Rejected datasets additionally contain:
 | Interactions | interaction_id | customer_id |
 | Customer 360 | customer_id | None |
 
-## 8. Relationships
+## 9. Relationships
 
 - One customer can have multiple accounts.
 - One customer can place multiple orders.
 - One customer can have multiple interactions.
+- Multiple original customer records can map to one canonical customer ID.
 - Customer 360 combines customer-level summaries from all three related datasets.
 
-## 9. Data Handling Rules
+## 10. Data Handling Rules
 
 - Primary keys must be unique and non-null.
 - Foreign keys must reference valid customers.
 - Order amounts must be positive.
 - Dates must be valid and cannot precede customer creation dates for related records.
 - Categorical fields must contain permitted values.
+- Duplicate customer identities are resolved using normalized email and phone matching.
+- Uncertain identity matches are flagged for manual review.
 - Invalid records are separated into quarantine outputs with rejection reasons.
