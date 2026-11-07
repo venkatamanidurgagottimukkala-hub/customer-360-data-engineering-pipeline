@@ -1,0 +1,28 @@
+{
+    "status": "SUCCESS",
+    "start_time": "2026-11-07T12:00:33.568834+00:00",
+    "end_time": "2026-11-07T12:00:34.100989+00:00",
+    "duration_seconds": 0.5322,
+    "run_id": "daa694f0ac128d2b",
+    "input_counts": {
+        "customers": 1000,
+        "accounts": 1988,
+        "orders": 2487,
+        "interactions": 2506
+    },
+    "processed_counts": {
+        "customers": 1000,
+        "accounts": 1988,
+        "orders": 2487,
+        "interactions": 2506
+    },
+    "rejected_counts": {
+        "customers": 0,
+        "accounts": 0,
+        "orders": 0,
+        "interactions": 0
+    },
+    "reconciliation_status": "PASS",
+    "reconciliation_checks": 16,
+    "failure_reason": null
+}

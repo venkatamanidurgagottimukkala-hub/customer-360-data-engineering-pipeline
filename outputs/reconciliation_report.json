@@ -1,0 +1,103 @@
+{
+    "report_generated_at": "2026-11-07T12:00:34.099663+00:00",
+    "overall_status": "PASS",
+    "total_checks": 16,
+    "passed_checks": 16,
+    "failed_checks": 0,
+    "checks": [
+        {
+            "check": "customers_record_reconciliation",
+            "status": "PASS",
+            "source_records": 1000,
+            "valid_records": 1000,
+            "rejected_records": 0
+        },
+        {
+            "check": "accounts_record_reconciliation",
+            "status": "PASS",
+            "source_records": 1988,
+            "valid_records": 1988,
+            "rejected_records": 0
+        },
+        {
+            "check": "orders_record_reconciliation",
+            "status": "PASS",
+            "source_records": 2487,
+            "valid_records": 2487,
+            "rejected_records": 0
+        },
+        {
+            "check": "interactions_record_reconciliation",
+            "status": "PASS",
+            "source_records": 2506,
+            "valid_records": 2506,
+            "rejected_records": 0
+        },
+        {
+            "check": "customers_database_count",
+            "status": "PASS",
+            "expected_records": 1000,
+            "database_records": 1000
+        },
+        {
+            "check": "accounts_database_count",
+            "status": "PASS",
+            "expected_records": 1988,
+            "database_records": 1988
+        },
+        {
+            "check": "orders_database_count",
+            "status": "PASS",
+            "expected_records": 2487,
+            "database_records": 2487
+        },
+        {
+            "check": "interactions_database_count",
+            "status": "PASS",
+            "expected_records": 2506,
+            "database_records": 2506
+        },
+        {
+            "check": "customer_360_record_count",
+            "status": "PASS",
+            "expected_records": 1000,
+            "database_records": 1000
+        },
+        {
+            "check": "order_amount_reconciliation",
+            "status": "PASS",
+            "source_total": 126337001.39,
+            "customer_360_total": 126337001.39
+        },
+        {
+            "check": "accounts_foreign_key_integrity",
+            "status": "PASS",
+            "orphan_records": 0
+        },
+        {
+            "check": "orders_foreign_key_integrity",
+            "status": "PASS",
+            "orphan_records": 0
+        },
+        {
+            "check": "interactions_foreign_key_integrity",
+            "status": "PASS",
+            "orphan_records": 0
+        },
+        {
+            "check": "account_count_reconciliation",
+            "status": "PASS",
+            "mismatches": 0
+        },
+        {
+            "check": "order_count_reconciliation",
+            "status": "PASS",
+            "mismatches": 0
+        },
+        {
+            "check": "interaction_count_reconciliation",
+            "status": "PASS",
+            "mismatches": 0
+        }
+    ]
+}

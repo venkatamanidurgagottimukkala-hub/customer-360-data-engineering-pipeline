@@ -1,0 +1,17 @@
+{
+    "customer_count": 15000,
+    "input_counts": {
+        "customers": 15000,
+        "accounts": 29948,
+        "orders": 37323,
+        "interactions": 38024
+    },
+    "total_input_records": 120295,
+    "valid_records": 120295,
+    "rejected_records": 0,
+    "customer_360_records": 15000,
+    "generation_time_seconds": 14.61,
+    "validation_time_seconds": 0.33,
+    "transformation_time_seconds": 1.19,
+    "total_execution_time_seconds": 16.14
+}
