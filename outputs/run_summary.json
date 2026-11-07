@@ -1,8 +1,8 @@
 {
     "status": "SUCCESS",
-    "start_time": "2026-11-07T12:00:33.568834+00:00",
-    "end_time": "2026-11-07T12:00:34.100989+00:00",
-    "duration_seconds": 0.5322,
+    "start_time": "2026-11-07T13:23:16.087134+00:00",
+    "end_time": "2026-11-07T13:23:16.763565+00:00",
+    "duration_seconds": 0.6764,
     "run_id": "daa694f0ac128d2b",
     "input_counts": {
         "customers": 1000,
@@ -21,6 +21,12 @@
         "accounts": 0,
         "orders": 0,
         "interactions": 0
+    },
+    "identity_resolution": {
+        "original_valid_customers": 1000,
+        "resolved_customers": 1000,
+        "merged_customers": 0,
+        "manual_review_pairs": 0
     },
     "reconciliation_status": "PASS",
     "reconciliation_checks": 16,

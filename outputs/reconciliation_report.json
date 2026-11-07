@@ -1,37 +1,42 @@
 {
-    "report_generated_at": "2026-11-07T12:00:34.099663+00:00",
+    "report_generated_at": "2026-11-07T13:23:16.761773+00:00",
     "overall_status": "PASS",
     "total_checks": 16,
     "passed_checks": 16,
     "failed_checks": 0,
+    "merged_customers": 0,
     "checks": [
         {
             "check": "customers_record_reconciliation",
             "status": "PASS",
             "source_records": 1000,
             "valid_records": 1000,
-            "rejected_records": 0
+            "rejected_records": 0,
+            "merged_records": 0
         },
         {
             "check": "accounts_record_reconciliation",
             "status": "PASS",
             "source_records": 1988,
             "valid_records": 1988,
-            "rejected_records": 0
+            "rejected_records": 0,
+            "merged_records": 0
         },
         {
             "check": "orders_record_reconciliation",
             "status": "PASS",
             "source_records": 2487,
             "valid_records": 2487,
-            "rejected_records": 0
+            "rejected_records": 0,
+            "merged_records": 0
         },
         {
             "check": "interactions_record_reconciliation",
             "status": "PASS",
             "source_records": 2506,
             "valid_records": 2506,
-            "rejected_records": 0
+            "rejected_records": 0,
+            "merged_records": 0
         },
         {
             "check": "customers_database_count",

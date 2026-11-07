@@ -18,11 +18,20 @@ def run_reconciliation(
     source_data,
     validated_data,
     rejected_data,
-    customer_360
+    customer_360,
+    identity_summary=None
 ):
 
     # Store all reconciliation results
     checks = []
+
+    # Identity resolution statistics
+    if identity_summary is None:
+        identity_summary = {}
+
+    merged_customer_count = identity_summary.get(
+        "merged_customers", 0
+    )
 
     # Connect to the SQLite database
     with sqlite3.connect(DB_PATH) as connection:
@@ -36,8 +45,15 @@ def run_reconciliation(
 
             rejected_count = len(rejected_data[dataset_name])
 
+            merged_count = (
+                merged_customer_count
+                if dataset_name == "customers"
+                else 0
+            )
+
             is_valid = (
-                source_count == valid_count + rejected_count
+                source_count
+                == valid_count + rejected_count + merged_count
             )
 
             checks.append({
@@ -45,7 +61,8 @@ def run_reconciliation(
                 "status": "PASS" if is_valid else "FAIL",
                 "source_records": source_count,
                 "valid_records": valid_count,
-                "rejected_records": rejected_count
+                "rejected_records": rejected_count,
+                "merged_records": merged_count
             })
 
         # STEP 2: Verify database record counts
@@ -207,6 +224,8 @@ def run_reconciliation(
             check["status"] == "FAIL" for check in checks
         ),
 
+        "merged_customers": merged_customer_count,
+
         "checks": checks
     }
 
@@ -234,6 +253,8 @@ def run_reconciliation(
     print("Passed:", report["passed_checks"])
 
     print("Failed:", report["failed_checks"])
+
+    print("Merged customers:", merged_customer_count)
 
     print("Report saved to:", REPORT_PATH)
 

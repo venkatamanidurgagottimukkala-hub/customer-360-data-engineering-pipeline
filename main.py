@@ -1,12 +1,14 @@
 import json
 import logging
+import pandas as pd
 
 from pathlib import Path
 from datetime import datetime, timezone
 from time import perf_counter
 
 from src.ingestion import load_all_sources
-from src.validation import validate_all_datasets
+from src.validation import validate_dataset
+from src.identity_resolution import resolve_customer_identities
 from src.publishing import publish_datasets
 from src.customer_360 import build_customer_360
 from src.storage import save_to_database
@@ -58,6 +60,7 @@ def main():
         "input_counts": {},
         "processed_counts": {},
         "rejected_counts": {},
+        "identity_resolution": {},
         "reconciliation_status": None,
         "reconciliation_checks": 0,
         "failure_reason": None
@@ -78,17 +81,125 @@ def main():
 
         logger.info("Source data ingestion completed")
 
-        # STEP 2: VALIDATION
-        logger.info("Starting data validation")
+        # STEP 2: CUSTOMER VALIDATION
+        logger.info("Starting customer validation")
 
-        valid, rejected = validate_all_datasets(datasets)
+        valid_customers, rejected_customers = validate_dataset(
+            "customers",
+            datasets["customers"]
+        )
 
-        logger.info("Data validation completed")
+        logger.info(
+            "Valid customers: %s | Rejected customers: %s",
+            len(valid_customers),
+            len(rejected_customers)
+        )
 
-        # STEP 3: BUILD CUSTOMER 360
+        # STEP 3: CUSTOMER IDENTITY RESOLUTION
+        logger.info("Starting customer identity resolution")
+
+        (
+            resolved_customers,
+            customer_mapping,
+            manual_review
+        ) = resolve_customer_identities(valid_customers)
+
+        # Calculate merged customer count
+        merged_customer_count = (
+            len(valid_customers) - len(resolved_customers)
+        )
+
+        # Replace original customer ID with canonical customer ID
+        resolved_customers["customer_id"] = (
+            resolved_customers["canonical_customer_id"]
+        )
+
+        resolved_customers = resolved_customers.drop(
+            columns=["canonical_customer_id"]
+        )
+
+        logger.info(
+            "Identity resolution completed | "
+            "Original valid customers: %s | "
+            "Resolved customers: %s | "
+            "Merged customers: %s | "
+            "Manual review pairs: %s",
+            len(valid_customers),
+            len(resolved_customers),
+            merged_customer_count,
+            len(manual_review)
+        )
+
+        # STEP 4: CREATE CUSTOMER ID LOOKUP
+        customer_id_mapping = dict(
+            zip(
+                customer_mapping["original_customer_id"],
+                customer_mapping["canonical_customer_id"]
+            )
+        )
+
+        # STEP 5: UPDATE CHILD DATASET CUSTOMER IDs
+        logger.info("Updating child dataset customer references")
+
+        child_datasets = {}
+
+        for dataset_name in [
+            "accounts",
+            "orders",
+            "interactions"
+        ]:
+
+            child_df = datasets[dataset_name].copy()
+
+            child_df["customer_id"] = child_df["customer_id"].map(
+                lambda customer_id: customer_id_mapping.get(
+                    str(customer_id),
+                    customer_id
+                ) if pd.notna(customer_id) else customer_id
+            )
+
+            child_datasets[dataset_name] = child_df
+
+        # STEP 6: VALIDATE ALL CHILD DATASETS
+        logger.info("Starting child dataset validation")
+
+        validated_data = {
+            "customers": resolved_customers
+        }
+
+        rejected_data = {
+            "customers": rejected_customers
+        }
+
+        for dataset_name in [
+            "accounts",
+            "orders",
+            "interactions"
+        ]:
+
+            valid_df, rejected_df = validate_dataset(
+                dataset_name,
+                child_datasets[dataset_name],
+                customers=resolved_customers
+            )
+
+            validated_data[dataset_name] = valid_df
+
+            rejected_data[dataset_name] = rejected_df
+
+            logger.info(
+                "%s | Valid: %s | Rejected: %s",
+                dataset_name,
+                len(valid_df),
+                len(rejected_df)
+            )
+
+        # STEP 7: BUILD CUSTOMER 360
         logger.info("Building Customer 360 dataset")
 
-        customer_360 = build_customer_360(valid)
+        customer_360 = build_customer_360(
+            validated_data
+        )
 
         customer_360_path = (
             PROCESSED_DIR / "customer_360.csv"
@@ -104,12 +215,12 @@ def main():
             len(customer_360)
         )
 
-        # STEP 4: PUBLISH CSV DATASETS
+        # STEP 8: PUBLISH CSV DATASETS
         logger.info("Starting data publishing")
 
         run_id, summary = publish_datasets(
-            valid,
-            rejected
+            validated_data,
+            rejected_data
         )
 
         metrics["run_id"] = run_id
@@ -120,13 +231,37 @@ def main():
 
             metrics["rejected_counts"][name] = counts["rejected"]
 
+        # STEP 9: SAVE IDENTITY RESOLUTION REPORTS
+        customer_mapping["run_id"] = run_id
+
+        manual_review["run_id"] = run_id
+
+        customer_mapping.to_csv(
+            OUTPUT_DIR / "customer_identity_mapping.csv",
+            index=False
+        )
+
+        manual_review.to_csv(
+            OUTPUT_DIR / "identity_manual_review.csv",
+            index=False
+        )
+
+        metrics["identity_resolution"] = {
+            "original_valid_customers": len(valid_customers),
+            "resolved_customers": len(resolved_customers),
+            "merged_customers": merged_customer_count,
+            "manual_review_pairs": len(manual_review)
+        }
+
+        logger.info("Identity resolution reports saved")
+
         logger.info("CSV publishing completed")
 
-        # STEP 5: SAVE DATA INTO SQLITE
+        # STEP 10: SAVE DATA INTO SQLITE
         logger.info("Starting SQLite database storage")
 
         database_path = save_to_database(
-            valid,
+            validated_data,
             customer_360
         )
 
@@ -135,14 +270,19 @@ def main():
             database_path
         )
 
-        # STEP 6: RUN RECONCILIATION
+        # STEP 11: RUN RECONCILIATION
         logger.info("Starting reconciliation checks")
+
+        identity_summary = {
+            "merged_customers": merged_customer_count
+        }
 
         reconciliation_report = run_reconciliation(
             datasets,
-            valid,
-            rejected,
-            customer_360
+            validated_data,
+            rejected_data,
+            customer_360,
+            identity_summary=identity_summary
         )
 
         metrics["reconciliation_status"] = (
@@ -167,7 +307,9 @@ def main():
         # Mark pipeline successful
         metrics["status"] = "SUCCESS"
 
-        logger.info("CUSTOMER 360 PIPELINE COMPLETED SUCCESSFULLY")
+        logger.info(
+            "CUSTOMER 360 PIPELINE COMPLETED SUCCESSFULLY"
+        )
 
     except Exception as error:
 

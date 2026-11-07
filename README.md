@@ -2,21 +2,25 @@
 
 ## 1. Project Overview
 
-The Customer 360 Data Engineering Pipeline is a Python-based data engineering solution that integrates customer, account, order and interaction datasets into a unified Customer 360 view.
+The Customer 360 Data Engineering Pipeline is a Python-based data engineering solution that integrates customer, account, order, and interaction datasets into a unified Customer 360 view.
 
-The pipeline performs source data ingestion, data validation, transformation, publishing, SQLite storage and reconciliation.
+The pipeline performs source data ingestion, schema validation, data quality checks, customer identity resolution, transformation, publishing, SQLite storage, and reconciliation.
 
-It is designed to support reliable data processing through deterministic data generation, duplicate detection, data quality checks, run tracking and automated testing.
+It is designed to support reliable and reproducible data processing through deterministic data generation, duplicate detection, data lineage, run tracking, automated testing, and performance optimization.
 
 ## 2. Key Features
 
 - Synthetic data generation using Faker and Pandas.
 - Ingestion of multiple CSV source datasets.
-- Schema validation and data quality checks.
+- Schema and data quality validation.
 - Duplicate primary key detection.
 - Foreign key integrity validation.
 - Date and business rule validation.
 - Rejected record quarantine with rejection reasons.
+- Deterministic customer identity resolution.
+- Canonical customer ID assignment.
+- Manual review flags for uncertain identity matches.
+- Preservation of associated account, order, and interaction records during identity resolution.
 - Unified Customer 360 transformation.
 - Deterministic pipeline run identification.
 - SQLite database storage.
@@ -42,43 +46,64 @@ It is designed to support reliable data processing through deterministic data ge
 
 The pipeline follows this processing flow:
 
-Source Data Generation  
-↓  
-Raw CSV Datasets  
-↓  
-Data Ingestion  
-↓  
-Schema Validation  
-↓  
-Data Quality Validation  
-↓  
-Valid Records / Rejected Records  
-↓  
-Customer 360 Transformation  
-↓  
-CSV Publishing and SQLite Storage  
-↓  
-Data Reconciliation  
-↓  
-Execution Reports
+1. Synthetic source data generation.
+2. Raw CSV dataset creation.
+3. Data ingestion and schema validation.
+4. Customer data quality validation.
+5. Customer identity resolution.
+6. Canonical customer ID assignment.
+7. Child dataset customer ID mapping.
+8. Account, order, and interaction validation.
+9. Customer 360 transformation.
+10. CSV publishing and SQLite storage.
+11. Data reconciliation.
+12. Execution reports and logs.
 
 ## 5. Source Datasets
 
 The pipeline processes four source datasets.
 
 ### Customers
-Contains customer identity and contact information.
+Contains customer identity and contact information, including customer ID, name, email, phone, and creation timestamp.
 
 ### Accounts
-Contains customer account information, account types and account statuses.
+Contains customer account information, account types, account statuses, and creation timestamps.
 
 ### Orders
-Contains product information, order amounts, order statuses and order dates.
+Contains product information, order amounts, order statuses, and order dates.
 
 ### Interactions
 Contains customer communication and interaction history.
 
-## 6. Customer 360 Output
+## 6. Customer Identity Resolution
+
+The identity resolution module identifies potential duplicate customer records using normalized email addresses and phone numbers.
+
+### Matching Rules
+
+| Condition | Action |
+|---|---|
+| Same normalized email and phone | Automatically merge |
+| Same email but different phone | Flag for manual review |
+| Same phone but different email | Flag for manual review |
+| Similar names alone | Do not automatically merge |
+
+### Canonical Customer ID
+
+The lexicographically smallest customer ID is selected as the canonical ID for automatically matched customer records.
+
+Associated account, order, and interaction records are mapped to the canonical customer ID before foreign key validation.
+
+The pipeline generates two identity-related reports:
+
+- `outputs/customer_identity_mapping.csv`
+- `outputs/identity_manual_review.csv`
+
+These reports provide traceability for resolved identities and uncertain matches.
+
+Fuzzy name matching is intentionally not used to avoid incorrectly merging customers based only on similar names.
+
+## 7. Customer 360 Output
 
 The unified Customer 360 dataset contains:
 
@@ -91,9 +116,9 @@ The unified Customer 360 dataset contains:
 - Total interaction count.
 - Latest interaction date.
 
-The transformation uses customer-level aggregation and left joins to retain customers even when they have no orders or interactions.
+The transformation uses customer-level aggregation and left joins to retain customers even when they have no accounts, orders, or interactions.
 
-## 7. Data Quality and Validation
+## 8. Data Quality and Validation
 
 The validation layer checks:
 
@@ -109,33 +134,38 @@ Invalid records are separated into quarantine datasets with rejection reasons.
 
 The validation implementation uses vectorized Pandas operations to improve processing performance.
 
-## 8. Idempotency and Traceability
+## 9. Idempotency and Traceability
 
 The pipeline generates a deterministic run ID using SHA-256 hashing of the source CSV files.
 
-The run ID and source filename are added to the published source datasets.
+The run ID and source filename are added to published source datasets.
+
+Customer identity mapping and manual review reports also include the run ID.
 
 Repeated processing of unchanged input produces the same run ID and replaces the current output datasets rather than appending duplicate records.
 
-## 9. Database Storage
+## 10. Database Storage
 
 The pipeline stores five tables in SQLite:
 
-- customers
-- accounts
-- orders
-- interactions
-- customer_360
+- `customers`
+- `accounts`
+- `orders`
+- `interactions`
+- `customer_360`
 
 Database location:
 
 `data/customer360.db`
 
-## 10. Reconciliation
+The database represents the current processed dataset state rather than maintaining a historical snapshot archive.
+
+## 11. Reconciliation
 
 The reconciliation layer performs 16 automated checks, including:
 
 - Source-to-valid-and-rejected record reconciliation.
+- Merged customer count reconciliation.
 - Database record count verification.
 - Customer 360 record count verification.
 - Order amount reconciliation.
@@ -146,7 +176,9 @@ The results are saved to:
 
 `outputs/reconciliation_report.json`
 
-## 11. Performance Benchmark
+The successful pipeline execution completed all 16 reconciliation checks.
+
+## 12. Performance Benchmark
 
 A benchmark was conducted using 15,000 customers and 120,295 total records.
 
@@ -169,130 +201,4 @@ It was optimized using vectorized Pandas operations such as:
 - `isna()`
 - `duplicated()`
 - `isin()`
-- `to_datetime()`
-- `to_numeric()`
-
-**Result:** Validation became approximately 191 times faster, reducing validation execution time by approximately 99.48%.
-
-Benchmark results are saved in:
-
-`outputs/performance_benchmark.json`
-
-## 12. Automated Testing
-
-The project uses Pytest for automated testing.
-
-Run the complete test suite:
-
-```bash
-python -m pytest -v
-```
-
-Current test results:
-
-- Total tests: 16
-- Passed: 16
-- Failed: 0
-
-The tests cover ingestion, schema validation, data quality rules and pipeline failure handling.
-
-## 13. Project Setup
-
-### Prerequisites
-
-- Python 3.14 or compatible Python version.
-- Git.
-- PowerShell or terminal.
-
-### Step 1: Clone the repository
-
-```bash
-git clone <your-github-repository-url>
-```
-
-### Step 2: Navigate to the project
-
-```bash
-cd <project-folder>
-```
-
-### Step 3: Create a virtual environment
-
-```bash
-python -m venv .venv
-```
-
-### Step 4: Activate the environment
-
-Windows PowerShell:
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-### Step 5: Install dependencies
-
-```bash
-python -m pip install -r requirements.txt
-```
-
-## 14. Running the Pipeline
-
-### Generate raw datasets
-
-```bash
-python -m src.generate_raw_data
-```
-
-### Execute the complete pipeline
-
-```bash
-python main.py
-```
-
-### Run automated tests
-
-```bash
-python -m pytest -v
-```
-
-### Run the performance benchmark
-
-```bash
-python benchmark.py
-```
-
-## 15. Output Files
-
-| Location | Description |
-|---|---|
-| `data/raw/` | Raw source CSV datasets |
-| `data/processed/` | Validated and transformed datasets |
-| `data/quarantine/` | Rejected records and rejection reasons |
-| `data/customer360.db` | SQLite database |
-| `outputs/pipeline.log` | Pipeline execution logs |
-| `outputs/run_summary.json` | Pipeline execution summary |
-| `outputs/reconciliation_report.json` | Reconciliation results |
-| `outputs/performance_benchmark.json` | Benchmark results |
-
-## 16. Design Considerations and Limitations
-
-- Duplicate primary keys are handled deterministically by retaining the first occurrence and rejecting subsequent occurrences.
-- Records with invalid customer references are rejected rather than incorrectly associated with another customer.
-- The current implementation uses exact customer identifiers for relationship validation; fuzzy identity matching is not implemented.
-- The SQLite tables represent the latest successful dataset state rather than a historical snapshot archive.
-- Recovery testing currently verifies that an ingestion failure prevents database storage and that a subsequent successful run can complete.
-- The current pipeline is designed as a reproducible local data engineering implementation.
-
-## 17. Project Outcome
-
-The project successfully demonstrates an end-to-end Customer 360 data engineering workflow.
-
-Key verified results:
-
-- 120,295 records processed in the performance benchmark.
-- 15,000 unified Customer 360 records generated.
-- 16 automated tests passed.
-- 16 reconciliation checks passed.
-- Approximately 191x faster validation after optimization.
-- Successful execution of the integrated pipeline.
+- `to_datetime()
